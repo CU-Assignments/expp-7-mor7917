@@ -1,0 +1,159 @@
+import java.sql.*;
+import java.util.*;
+
+public class StudentApp {
+    
+    public static class Student {
+        private int studentID;
+        private String name, department;
+        private double marks;
+
+        public Student(int studentID, String name, String department, double marks) {
+            this.studentID = studentID;
+            this.name = name;
+            this.department = department;
+            this.marks = marks;
+        }
+
+        public int getStudentID() { return studentID; }
+        public String getName() { return name; }
+        public String getDepartment() { return department; }
+        public double getMarks() { return marks; }
+    }
+
+    public static class StudentController {
+        private Connection conn;
+
+        public StudentController(String url, String user, String pass) throws SQLException {
+            conn = DriverManager.getConnection(url, user, pass);
+        }
+
+        public boolean addStudent(Student student) {
+            String query = "INSERT INTO Student (StudentID, Name, Department, Marks) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setInt(1, student.getStudentID());
+                stmt.setString(2, student.getName());
+                stmt.setString(3, student.getDepartment());
+                stmt.setDouble(4, student.getMarks());
+                return stmt.executeUpdate() > 0;
+            } catch (SQLException e) { return false; }
+        }
+
+        public Student getStudent(int studentID) {
+            String query = "SELECT * FROM Student WHERE StudentID = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setInt(1, studentID);
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return new Student(rs.getInt("StudentID"), rs.getString("Name"),
+                            rs.getString("Department"), rs.getDouble("Marks"));
+                }
+            } catch (SQLException e) {}
+            return null;
+        }
+
+        public List<Student> getAllStudents() {
+            List<Student> students = new ArrayList<>();
+            String query = "SELECT * FROM Student";
+            try (Statement stmt = conn.createStatement()) {
+                ResultSet rs = stmt.executeQuery(query);
+                while (rs.next()) {
+                    students.add(new Student(rs.getInt("StudentID"), rs.getString("Name"),
+                            rs.getString("Department"), rs.getDouble("Marks")));
+                }
+            } catch (SQLException e) {}
+            return students;
+        }
+
+        public boolean updateStudent(Student student) {
+            String query = "UPDATE Student SET Name = ?, Department = ?, Marks = ? WHERE StudentID = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setString(1, student.getName());
+                stmt.setString(2, student.getDepartment());
+                stmt.setDouble(3, student.getMarks());
+                stmt.setInt(4, student.getStudentID());
+                return stmt.executeUpdate() > 0;
+            } catch (SQLException e) { return false; }
+        }
+
+        public boolean deleteStudent(int studentID) {
+            String query = "DELETE FROM Student WHERE StudentID = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setInt(1, studentID);
+                return stmt.executeUpdate() > 0;
+            } catch (SQLException e) { return false; }
+        }
+    }
+
+    public static class StudentView {
+        private static Scanner scanner = new Scanner(System.in);
+
+        public static void showMenu() {
+            System.out.println("\n1. Add Student\n2. View Student\n3. View All Students\n4. Update Student\n5. Delete Student\n6. Exit");
+            System.out.print("Choose an option: ");
+        }
+
+        public static Student getStudentDetails() {
+            System.out.print("Enter Student ID: ");
+            int studentID = scanner.nextInt();
+            scanner.nextLine(); // consume newline
+            System.out.print("Enter Name: ");
+            String name = scanner.nextLine();
+            System.out.print("Enter Department: ");
+            String department = scanner.nextLine();
+            System.out.print("Enter Marks: ");
+            double marks = scanner.nextDouble();
+            return new Student(studentID, name, department, marks);
+        }
+
+        public static int getStudentID() {
+            System.out.print("Enter Student ID: ");
+            return scanner.nextInt();
+        }
+
+        public static void showAllStudents(List<Student> students) {
+            if (students.isEmpty()) {
+                System.out.println("No students found.");
+            } else {
+                students.forEach(s -> System.out.println(s.getStudentID() + ": " + s.getName() + ", " + s.getDepartment() + ", " + s.getMarks()));
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            StudentController controller = new StudentController("jdbc:mysql://localhost:3306/your_database", "username", "password");
+            while (true) {
+                StudentView.showMenu();
+                int option = new Scanner(System.in).nextInt();
+                switch (option) {
+                    case 1:
+                        controller.addStudent(StudentView.getStudentDetails());
+                        break;
+                    case 2:
+                        Student student = controller.getStudent(StudentView.getStudentID());
+                        if (student != null)
+                            System.out.println(student.getStudentID() + ": " + student.getName() + ", " + student.getDepartment() + ", " + student.getMarks());
+                        else
+                            System.out.println("Student not found.");
+                        break;
+                    case 3:
+                        StudentView.showAllStudents(controller.getAllStudents());
+                        break;
+                    case 4:
+                        controller.updateStudent(StudentView.getStudentDetails());
+                        break;
+                    case 5:
+                        controller.deleteStudent(StudentView.getStudentID());
+                        break;
+                    case 6:
+                        return;
+                    default:
+                        System.out.println("Invalid option.");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
